@@ -25,7 +25,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get install -y \
-              libflac-dev libflac++-dev libpulse-dev zlib1g-dev \
+              libflac-dev libflac++-dev libpulse-dev libpipewire-0.3-dev zlib1g-dev \
               libssl-dev libdbus-1-dev \
               libqt5quickwidgets5 libqt5quickcontrols2-5 libqt5qmlmodels5 libqt5qml5 \
               libqt5dbus5 libqt5svg5-dev qttools5-dev qttools5-dev-tools \

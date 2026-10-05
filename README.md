@@ -17,7 +17,7 @@ The build can be achieved on any platform supporting Qt version 5.15. See `debia
 ### Linux/BSD
 
 Running Noson in "freedesktop" allows the following extra features.
-- Streaming the PulseAudio output on your Sonos devices
+- Streaming the PipeWire / PulseAudio output on your Sonos devices (PipeWire native low-latency preferred, Pulse fallback)
 - MPRIS2 player interface
 
 #### Install the dependencies
@@ -31,7 +31,7 @@ qml-module-qt-labs-settings qml-module-qtgraphicaleffects \
 qml-module-qtqml-models2 qml-module-qtquick2 qml-module-qtquick-controls2 \
 qml-module-qtquick-layouts qml-module-qtquick-particles2 \
 qml-module-qtquick-templates2 qml-module-qtquick-window2 \
-zlib1g-dev libssl-dev libflac-dev libflac++-dev libpulse-dev \
+zlib1g-dev libssl-dev libflac-dev libflac++-dev libpulse-dev libpipewire-0.3-dev \
 libdbus-1-dev libqt5dbus5
 ```
   - Build tools: `build-essential` `git` `cmake >= 3.8.2` `gcc | clang`
@@ -41,7 +41,7 @@ libdbus-1-dev libqt5dbus5
 ```bash
 yum install qt5-qtbase-devel qt5-qttools-devel qt5-qtdeclarative-devel \
 qt5-qtquickcontrols2-devel qt5-qtgraphicaleffects qt5-qtsvg-devel \
-qt5-qtsvg zlib-devel openssl-devel flac-devel pulseaudio-libs-devel \
+qt5-qtsvg zlib-devel openssl-devel flac-devel pulseaudio-libs-devel pipewire-devel \
 dbus-devel
 ```
   - Build tools: `git` `cmake >= 3.8.2` `gcc | clang`

@@ -15,7 +15,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake \
-              libflac-dev libflac++-dev libpulse-dev zlib1g-dev \
+              libflac-dev libflac++-dev libpulse-dev libpipewire-0.3-dev zlib1g-dev \
               libssl-dev libdbus-1-dev libgl1-mesa-dev libpulse0 \
               mesa-vulkan-drivers libxkbcommon-x11-0 libxcb-cursor0 \
               libxcb-icccm4 libxcb-util1 libxcb-image0 libxcb-keysyms1 \
