@@ -33,6 +33,15 @@ ApplicationWindow {
     visible: true
     title: "noson"
 
+    // With a system tray icon present, closing hides to tray instead
+    // of quitting (quit explicitly from the tray menu).
+    onClosing: {
+        if (typeof trayActive !== "undefined" && trayActive) {
+            close.accepted = false
+            mainView.visible = false
+        }
+    }
+
     // Design stuff
     width: 360
     height: 640

@@ -4,6 +4,11 @@
 
 #include <QtGlobal>
 #include <QGuiApplication>
+#ifndef Q_OS_ANDROID
+#include <QApplication>
+#include <QSystemTrayIcon>
+#include <QMenu>
+#endif
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QSettings>
@@ -77,7 +82,12 @@ int main(int argc, char *argv[])
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
     QGuiApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 #endif
+#ifdef Q_OS_ANDROID
     QGuiApplication app(argc, argv);
+#else
+    // QApplication (not QGuiApplication) for the system tray icon.
+    QApplication app(argc, argv);
+#endif
     setupApp(app);
 
     QSettings settings;
@@ -152,6 +162,43 @@ int main(int argc, char *argv[])
         qWarning() << "Failed to load QML";
         return -1;
     }
+
+#ifndef Q_OS_ANDROID
+    // System tray: close hides to tray, Quit leaves from the menu.
+    // --minimized starts tray-only (for autostart).
+    QObject* rootWin = engine->rootObjects().first();
+    const bool trayAvailable = QSystemTrayIcon::isSystemTrayAvailable();
+    engine->rootContext()->setContextProperty("trayActive",
+                                              QVariant(trayAvailable));
+    if (trayAvailable)
+    {
+        app.setQuitOnLastWindowClosed(false);
+        QSystemTrayIcon* tray = new QSystemTrayIcon(
+            QIcon::fromTheme("noson"), &app);
+        QMenu* menu = new QMenu();
+        QAction* toggle = menu->addAction(QObject::tr("Show/Hide"));
+        QAction* quit = menu->addAction(QObject::tr("Quit"));
+        QObject::connect(toggle, &QAction::triggered, [rootWin]() {
+            if (!rootWin)
+                return;
+            rootWin->setProperty("visible",
+                                 !rootWin->property("visible").toBool());
+        });
+        QObject::connect(quit, &QAction::triggered, &app,
+                         &QCoreApplication::quit);
+        QObject::connect(tray, &QSystemTrayIcon::activated,
+            [rootWin](QSystemTrayIcon::ActivationReason reason) {
+                if (reason == QSystemTrayIcon::Trigger && rootWin)
+                    rootWin->setProperty("visible",
+                        !rootWin->property("visible").toBool());
+            });
+        tray->setContextMenu(menu);
+        tray->setToolTip("Noson");
+        tray->show();
+        if (app.arguments().contains("--minimized") && rootWin)
+            rootWin->setProperty("visible", false);
+    }
+#endif
 
     ret = app.exec();
 
