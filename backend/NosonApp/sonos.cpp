@@ -25,7 +25,7 @@
 #include <noson/requestbroker.h>
 #include <noson/imageservice.h>
 #include <noson/filestreamer.h>
-#ifdef HAVE_PULSEAUDIO
+#if defined(HAVE_PULSEAUDIO) || defined(HAVE_PIPEWIRE)
 #include <noson/pulsestreamer.h>
 #endif
 
@@ -54,7 +54,7 @@ Sonos::Sonos(QObject* parent)
   // Register handlers to process remote request
   SONOS::RequestBrokerPtr imageService(new SONOS::ImageService());
   m_system.RegisterRequestBroker(imageService);
-#ifdef HAVE_PULSEAUDIO
+#if defined(HAVE_PULSEAUDIO) || defined(HAVE_PIPEWIRE)
   m_system.RegisterRequestBroker(SONOS::RequestBrokerPtr(new SONOS::PulseStreamer(imageService.get())));
 #endif
   m_system.RegisterRequestBroker(SONOS::RequestBrokerPtr(new SONOS::FileStreamer()));
@@ -553,7 +553,7 @@ void Sonos::endJob()
 
 bool Sonos::havePulseAudio()
 {
-#ifdef HAVE_PULSEAUDIO
+#if defined(HAVE_PULSEAUDIO) || defined(HAVE_PIPEWIRE)
   if (m_system.GetRequestBroker(PULSESTREAMER_CNAME))
     return true;
 #endif

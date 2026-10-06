@@ -39,7 +39,7 @@
 #include <noson/didlparser.h>
 #include <noson/imageservice.h>
 #include <noson/filestreamer.h>
-#ifdef HAVE_PULSEAUDIO
+#if defined(HAVE_PULSEAUDIO) || defined(HAVE_PIPEWIRE)
 #include <noson/pulsestreamer.h>
 #endif
 
@@ -160,7 +160,7 @@ int main(int argc, char** argv)
   {
     SONOS::RequestBrokerPtr imageService(new SONOS::ImageService());
     gSonos->RegisterRequestBroker(imageService);
-#ifdef HAVE_PULSEAUDIO
+#if defined(HAVE_PULSEAUDIO) || defined(HAVE_PIPEWIRE)
     gSonos->RegisterRequestBroker(SONOS::RequestBrokerPtr(new SONOS::PulseStreamer(imageService.get())));
 #endif
     gSonos->RegisterRequestBroker(SONOS::RequestBrokerPtr(new SONOS::FileStreamer()));
@@ -241,7 +241,7 @@ static bool parseCommand(const std::string& line)
       PRINT("EXIT                          Exit from CLI\n");
       PRINT("CONNECT {zone name}           Connect to a zone for control\n");
       PRINT("STATUS                        Show the playing status\n");
-#ifdef HAVE_PULSEAUDIO
+#if defined(HAVE_PULSEAUDIO) || defined(HAVE_PIPEWIRE)
       PRINT("PLAYPULSE                     Play stream from Pulse\n");
 #endif
       PRINT("PLAYURL {stream URL}          Play stream from URL\n");
@@ -620,7 +620,7 @@ static bool parseCommand(const std::string& line)
       else
         PERROR("Error: Missing arguments.\n");
     }
-#ifdef HAVE_PULSEAUDIO
+#if defined(HAVE_PULSEAUDIO) || defined(HAVE_PIPEWIRE)
     else if (token == "PLAYPULSE")
     {
       if (gPlayer->PlayPulse())
