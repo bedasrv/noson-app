@@ -45,6 +45,7 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <csignal>
 #include <string>
 #include <algorithm> // std::find
 
@@ -84,6 +85,12 @@ static bool parseCommand(const std::string& line);
 SONOS::System * gSonos = 0;
 SONOS::PlayerPtr gPlayer;
 int gDebug = 0;
+static volatile std::sig_atomic_t gServeStop = 0;
+
+static void serveSignalCB(int)
+{
+  gServeStop = 1;
+}
 
 void handleEventCB(void* handle)
 {
@@ -117,6 +124,13 @@ int main(int argc, char** argv)
     PRINT("\n  --sinkname <NAME>\n\n");
     PRINT("  Name of the PipeWire virtual sink (default: noson). Use a distinct\n");
     PRINT("  name when running alongside the GUI to avoid duplicate outputs.\n");
+    PRINT("\n  --serve\n\n");
+    PRINT("  Headless background mode: initialize and wait (for systemd).\n");
+    PRINT("  Combine with --zone and --pulse to auto-start streaming.\n");
+    PRINT("\n  --zone <NAME>\n\n");
+    PRINT("  Connect to a zone (with --serve or --exec).\n");
+    PRINT("\n  --pulse\n\n");
+    PRINT("  Start pulse streaming on the connected zone (with --serve).\n");
     PRINT("\n  --debug\n\n");
     PRINT("  Enable the debug output.\n");
     PRINT("\n  --help | -h\n\n");
@@ -212,6 +226,30 @@ int main(int argc, char** argv)
         break;
       pos = end + 1;
     }
+  }
+  else if (getCmd(argv, argv + argc, "--serve"))
+  {
+    // Headless background mode: optional zone connect + pulse start,
+    // then wait for SIGTERM/SIGINT (systemd). Event threads serve.
+    const char* zoneOpt = getCmdOption(argv, argv + argc, "--zone");
+    if (zoneOpt && *zoneOpt)
+    {
+      std::string cmd("CONNECT ");
+      cmd.append(zoneOpt);
+      parseCommand(cmd);
+    }
+    if (getCmd(argv, argv + argc, "--pulse"))
+    {
+      if (gPlayer)
+        parseCommand("PLAYPULSE");
+      else
+        PERROR("Error: --pulse needs --zone first.\n");
+    }
+    PRINT("Serving in background (SIGTERM/SIGINT to stop).\n");
+    std::signal(SIGTERM, serveSignalCB);
+    std::signal(SIGINT, serveSignalCB);
+    while (!gServeStop)
+      pause();
   }
   else
     readInStream();
