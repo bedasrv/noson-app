@@ -74,10 +74,12 @@
 #define PERROR1(a,b) fprintf(stderr, a, b)
 #define PERROR2(a,b,c) fprintf(stderr, a, b, c)
 #define PERROR3(a,b,c,d) fprintf(stderr, a, b, c, d)
+#define PERROR4(a,b,c,d,e) fprintf(stderr, a, b, c, d, e)
 
 static const char * getCmd(char **begin, char **end, const std::string& option);
 static const char * getCmdOption(char **begin, char **end, const std::string& option);
 static void readInStream();
+static bool parseCommand(const std::string& line);
 
 SONOS::System * gSonos = 0;
 SONOS::PlayerPtr gPlayer;
@@ -109,6 +111,12 @@ int main(int argc, char** argv)
     PRINT("\n  --deviceurl <URL>\n\n");
     PRINT("  Bypass the SSDP discovery by connecting to an endpoint. The typical URLs are:\n");
     PRINT("  http://{IPADDRESS}:1400 or http://{IPADDRESS}:3400\n");
+    PRINT("\n  --exec=\"CMD1; CMD2\"\n\n");
+    PRINT("  Run semicolon-separated commands non-interactively and exit.\n");
+    PRINT("  Example: --deviceurl=http://192.168.100.155:1400 --exec=\"CONNECT Bedroom; VOLUME 30\"\n");
+    PRINT("\n  --sinkname <NAME>\n\n");
+    PRINT("  Name of the PipeWire virtual sink (default: noson). Use a distinct\n");
+    PRINT("  name when running alongside the GUI to avoid duplicate outputs.\n");
     PRINT("\n  --debug\n\n");
     PRINT("  Enable the debug output.\n");
     PRINT("\n  --help | -h\n\n");
@@ -121,6 +129,15 @@ int main(int argc, char** argv)
   SONOS::System::Debug(gDebug);
 
   const char* deviceUrl = getCmdOption(argv, argv + argc, "--deviceurl");
+  const char* sinkName = getCmdOption(argv, argv + argc, "--sinkname");
+  const char* execCmds = getCmdOption(argv, argv + argc, "--exec");
+  if (sinkName && *sinkName)
+  {
+    // Isolate this instance's virtual sink (name + display) so headless
+    // control can run alongside the GUI without duplicate outputs.
+    setenv("NOSON_SINK_NAME", sinkName, 1);
+    setenv("NOSON_SINK_DESC", sinkName, 1);
+  }
 
 #ifdef __WINDOWS__
   //Initialize Winsock
@@ -178,7 +195,26 @@ int main(int argc, char** argv)
   for (SONOS::ZoneList::const_iterator it = zones.begin(); it != zones.end(); ++it)
     PRINT2("Found zone '%s' with coordinator '%s'\n", it->second->GetZoneName().c_str(), it->second->GetCoordinator()->c_str());
 
-  readInStream();
+  if (execCmds)
+  {
+    // Headless one-shot mode: run commands, then exit.
+    std::string cmds(execCmds);
+    size_t pos = 0;
+    while (pos < cmds.size())
+    {
+      size_t end = cmds.find(';', pos);
+      std::string cmd = cmds.substr(pos, end == std::string::npos ? end : end - pos);
+      size_t first = cmd.find_first_not_of(" \t");
+      size_t last = cmd.find_last_not_of(" \t");
+      if (first != std::string::npos && !parseCommand(cmd.substr(first, last - first + 1)))
+        break;
+      if (end == std::string::npos)
+        break;
+      pos = end + 1;
+    }
+  }
+  else
+    readInStream();
 
   if (gPlayer)
     gPlayer.reset();
@@ -263,6 +299,8 @@ static bool parseCommand(const std::string& line)
       PRINT("SEEK 1..                      Seek to track number\n");
       PRINT("VOLUME 0..100                 Set volume master\n");
       PRINT("VOLUME {player} 0..100        Set volume\n");
+      PRINT("GETVOLUME [{player}]          Show volume and mute state\n");
+      PRINT("MUTE ON|OFF [{player}]        Mute or unmute\n");
       PRINT("SLEEPTIMER 0..65535           Set sleep timer\n");
       PRINT("SHOWQUEUE                     Show queue content\n");
       PRINT("SHOWFV                        Show favorites\n");
@@ -670,6 +708,63 @@ static bool parseCommand(const std::string& line)
             string_to_uint8(param2.c_str(), &value);
             if (gPlayer->SetVolume((*ip)->GetUUID(), value))
               PERROR3("%s [%s]: volume %u\n", (*ip)->c_str(), (*ip)->GetUUID().c_str(), value);
+            else
+              PERROR2("%s [%s]: Failed\n", (*ip)->c_str(), (*ip)->GetUUID().c_str());
+          }
+        }
+      }
+      else
+        PERROR("Error: Missing arguments.\n");
+    }
+    else if (token == "GETVOLUME")
+    {
+      std::string param;
+      if (++it != tokens.end())
+      {
+        param.assign(*it);
+        while(++it != tokens.end())
+          param.append(" ").append(*it);
+      }
+      SONOS::ZonePtr pl = gPlayer->GetZone();
+      for (SONOS::Zone::iterator ip = pl->begin(); ip != pl->end(); ++ip)
+      {
+        if (param.empty() || param == **ip)
+        {
+          uint8_t value = 0, mute = 0;
+          if (gPlayer->GetVolume((*ip)->GetUUID(), &value) &&
+              gPlayer->GetMute((*ip)->GetUUID(), &mute))
+            PERROR4("%s [%s]: volume %u mute %u\n", (*ip)->c_str(), (*ip)->GetUUID().c_str(), value, mute);
+          else
+            PERROR2("%s [%s]: Failed\n", (*ip)->c_str(), (*ip)->GetUUID().c_str());
+        }
+      }
+    }
+    else if (token == "MUTE")
+    {
+      if (++it != tokens.end())
+      {
+        bool all = true;
+        std::string param(*it);
+        std::string param2;
+        while(++it != tokens.end())
+        {
+          all = false;
+          if ((it + 1) == tokens.end())
+            param2.append(*it);
+          else
+            param.append(" ").append(*it);
+        }
+        if (all)
+          param2.assign(param);
+        std::string mode(upstr(param2));
+        uint8_t value = (mode == "ON" || mode == "1") ? 1 : 0;
+        SONOS::ZonePtr pl = gPlayer->GetZone();
+        for (SONOS::Zone::iterator ip = pl->begin(); ip != pl->end(); ++ip)
+        {
+          if (all || param == **ip)
+          {
+            if (gPlayer->SetMute((*ip)->GetUUID(), value))
+              PERROR3("%s [%s]: mute %u\n", (*ip)->c_str(), (*ip)->GetUUID().c_str(), value);
             else
               PERROR2("%s [%s]: Failed\n", (*ip)->c_str(), (*ip)->GetUUID().c_str());
           }
